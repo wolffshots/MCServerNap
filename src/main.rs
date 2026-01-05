@@ -34,9 +34,15 @@ enum Commands {
         /// Arguments for the command (pass all Java/batch args here)
         #[arg(num_args(0..))]
         args: Vec<String>,
+        /// Minecraft server host (use --server-host)
+        #[arg(long, default_value = "127.0.0.1")]
+        server_host: String,
         /// Minecraft server port (use --server-port)
         #[arg(long)]
         server_port: u16,
+        /// RCON host (use --rcon-host)
+        #[arg(long, default_value = "127.0.0.1")]
+        rcon_host: String,
         /// RCON port (use --rcon-port)
         #[arg(long)]
         rcon_port: u16,
@@ -70,12 +76,15 @@ async fn main() -> Result<()> {
             port,
             cmd,
             args,
+            server_host,
             server_port,
+            rcon_host,
             rcon_port,
             rcon_pass,
         } => {
             let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
-            let rcon_addr = Arc::new(format!("127.0.0.1:{}", rcon_port));
+            let rcon_addr = Arc::new(format!("{}:{}", rcon_host, rcon_port));
+            let server_addr = Arc::new(format!("{}:{}", server_host, server_port));
             let rcon_pass = Arc::new(rcon_pass);
 
             let server_state = Arc::new(Mutex::new(ServerState::Stopped));
@@ -94,7 +103,7 @@ async fn main() -> Result<()> {
                     listener,
                     cmd,
                     args,
-                    server_port,
+                    server_addr,
                     rcon_addr,
                     rcon_pass,
                     server_state,
@@ -143,7 +152,7 @@ async fn main_loop(
     listener: TcpListener,
     cmd: String,
     args: Vec<String>,
-    server_port: u16,
+    server_addr: Arc<String>,
     rcon_addr: Arc<String>,
     rcon_pass: Arc<String>,
     server_state: Arc<Mutex<ServerState>>,
@@ -287,9 +296,9 @@ async fn main_loop(
                         ServerState::Running => {
                             // Server is running: proxy connection to actual Minecraft server
                             log::info!("Proxying connection for {}", peer);
+                            let server_addr_clone = server_addr.clone();
                             tokio::spawn(async move {
-                                let server_addr = format!("127.0.0.1:{}", server_port);
-                                match TcpStream::connect(server_addr).await {
+                                match TcpStream::connect(server_addr_clone.as_str()).await {
                                     Ok(mut server_socket) => {
                                         server_socket.set_nodelay(true).unwrap();
                                         match tokio::io::copy_bidirectional(

@@ -45,7 +45,9 @@ export MC_CONTAINER MC_HOST MC_PORT RCON_HOST RCON_PORT
 # Start mcservernap
 # The cmd is our helper script that starts the minecraft container
 exec mcservernap listen "${NAP_HOST}" "${NAP_PORT}" \
+    --server-host "${MC_HOST}" \
     --server-port "${MC_PORT}" \
+    --rcon-host "${RCON_HOST}" \
     --rcon-port "${RCON_PORT}" \
     --rcon-pass "${RCON_PASSWORD}" \
     /start-minecraft.sh
