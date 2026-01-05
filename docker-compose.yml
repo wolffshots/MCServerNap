@@ -1,0 +1,91 @@
+version: "3.8"
+
+services:
+  # MCServerNap proxy - always running, listens for players
+  nap:
+    build: .
+    container_name: mcservernap
+    restart: unless-stopped
+    ports:
+      - "25565:25565"  # Public Minecraft port
+    environment:
+      # Proxy settings
+      NAP_HOST: "0.0.0.0"
+      NAP_PORT: "25565"
+      
+      # Target Minecraft container
+      MC_CONTAINER: "minecraft"
+      MC_HOST: "minecraft"
+      MC_PORT: "25565"
+      
+      # RCON settings (must match minecraft service)
+      RCON_HOST: "minecraft"
+      RCON_PORT: "25575"
+      RCON_PASSWORD: "${RCON_PASSWORD:-minecraft}"
+      
+      # Idle timeout (seconds) - stop server after no players for this long
+      IDLE_TIMEOUT: "${IDLE_TIMEOUT:-600}"
+      POLL_INTERVAL: "${POLL_INTERVAL:-60}"
+      
+      # MOTD shown in server browser when server is sleeping
+      MOTD_TEXT: "${MOTD_TEXT:-Napping... Join to start server}"
+      MOTD_COLOR: "${MOTD_COLOR:-aqua}"
+      MOTD_BOLD: "${MOTD_BOLD:-true}"
+      
+      # Message shown when player tries to connect
+      CONNECTION_MSG_TEXT: "${CONNECTION_MSG_TEXT:-Server is starting up. Please wait and try again...}"
+      CONNECTION_MSG_COLOR: "${CONNECTION_MSG_COLOR:-light_purple}"
+      CONNECTION_MSG_BOLD: "${CONNECTION_MSG_BOLD:-true}"
+    volumes:
+      # Docker socket for container control
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Optional: persist config
+      - ./nap-config:/config
+    networks:
+      - minecraft-net
+    depends_on:
+      - minecraft
+
+  # Minecraft server - started/stopped by MCServerNap
+  minecraft:
+    image: itzg/minecraft-server:latest
+    container_name: minecraft
+    # Don't auto-start - MCServerNap will start it
+    restart: "no"
+    # No port exposure - nap proxy handles it
+    environment:
+      EULA: "TRUE"
+      TYPE: "${MC_TYPE:-VANILLA}"
+      VERSION: "${MC_VERSION:-LATEST}"
+      MEMORY: "${MC_MEMORY:-2G}"
+      
+      # Server port (internal)
+      SERVER_PORT: "25565"
+      
+      # RCON must be enabled for idle detection
+      ENABLE_RCON: "true"
+      RCON_PORT: "25575"
+      RCON_PASSWORD: "${RCON_PASSWORD:-minecraft}"
+      
+      # Stop container when server stops (important for nap to detect)
+      STOP_SERVER_ANNOUNCE_DELAY: "5"
+      
+      # Additional settings
+      VIEW_DISTANCE: "${VIEW_DISTANCE:-10}"
+      MAX_PLAYERS: "${MAX_PLAYERS:-20}"
+      MOTD: "${SERVER_MOTD:-A Minecraft Server}"
+      DIFFICULTY: "${DIFFICULTY:-normal}"
+      MODE: "${GAMEMODE:-survival}"
+      PVP: "${PVP:-true}"
+      ONLINE_MODE: "${ONLINE_MODE:-true}"
+    volumes:
+      - ./minecraft-data:/data
+    networks:
+      - minecraft-net
+    stdin_open: true
+    tty: true
+
+networks:
+  minecraft-net:
+    driver: bridge
+
