@@ -8,6 +8,13 @@ set -e
 
 echo "[MCServerNap] Starting Minecraft container: ${MC_CONTAINER}"
 
+# Check if container exists
+if ! docker inspect "${MC_CONTAINER}" &>/dev/null; then
+    echo "[MCServerNap] ERROR: Container ${MC_CONTAINER} does not exist!"
+    echo "[MCServerNap] Run 'docker-compose up -d minecraft' to recreate it"
+    exit 1
+fi
+
 # Start the container (if stopped) or unpause (if paused)
 if docker inspect -f '{{.State.Paused}}' "${MC_CONTAINER}" 2>/dev/null | grep -q true; then
     echo "[MCServerNap] Unpausing container..."
